@@ -1,14 +1,24 @@
+#-------------------------------------------------------------------------------------------------
+# Import libraries
+#-------------------------------------------------------------------------------------------------
 import numpy as np
 from glob import glob
+import cv2                
+import matplotlib.pyplot as plt                        
+%matplotlib inline  
+import torch
+import torchvision.models as models
+from PIL import Image
+import torchvision.transforms as transforms
+import os
+from torchvision import datasets
+ImageFile.LOAD_TRUNCATED_IMAGES = True  # fixes problem of truncated images
 
+#-------------------------------------------------------------------------------------------------
 # load filenames for human and dog images
 human_files = np.array(glob("/data/lfw/*/*"))
 dog_files = np.array(glob("/data/dog_images/*/*/*"))
-
-import cv2                
-import matplotlib.pyplot as plt                        
-%matplotlib inline                               
-
+                           
 #-------------------------------------------------------------------------------------------------
 # extract pre-trained face detector
 face_cascade = cv2.CascadeClassifier('haarcascades/haarcascade_frontalface_alt.xml')
@@ -31,16 +41,13 @@ def face_detector_2(img_path):
     return len(faces) > 0
     
 #-------------------------------------------------------------------------------------------------
-import torch
-import torchvision.models as models
-
-# define VGG16 model
+# Define VGG16 model
 VGG16 = models.vgg16(pretrained=True)
 
-# check if CUDA is available
+# Check if CUDA is available
 use_cuda = torch.cuda.is_available()
 
-# move model to GPU if CUDA is available
+# Move model to GPU if CUDA is available
 if use_cuda:
     VGG16 = VGG16.cuda()
     
@@ -132,7 +139,8 @@ def train(n_epochs, loaders, model, optimizer, criterion, use_cuda, save_path):
             valid_loss_min = valid_loss    
 
     return model
-    
+
+#-------------------------------------------------------------------------------------------------    
  # define model testing
  def test(loaders, model, criterion, use_cuda):
 
@@ -169,16 +177,6 @@ def train(n_epochs, loaders, model, optimizer, criterion, use_cuda, save_path):
         
 #-------------------------------------------------------------------------------------------------
 # Create new model using transfer learning and the VGG-16 model
-
-import os
-import torch
-import torchvision.models as models
-from torchvision import datasets
-import torchvision.transforms as transforms
-import numpy as np
-from PIL import ImageFile
-ImageFile.LOAD_TRUNCATED_IMAGES = True  # fixes problem of truncated images
-
 batch_size = 10
 num_workers = 0
 
@@ -229,10 +227,8 @@ use_cuda = torch.cuda.is_available()
 if use_cuda:
     model_transfer = model_transfer.cuda()
     
-
 criterion_transfer = nn.CrossEntropyLoss()
 optimizer_transfer = optim.SGD(model_transfer.classifier.parameters(), lr=0.0005)
-
 
 # train the model
 n_epochs = 50
@@ -244,10 +240,6 @@ model_transfer.load_state_dict(torch.load('model_transfer.pt'))
 test(loaders_transfer, model_transfer, criterion_transfer, use_cuda)
 
 #-------------------------------------------------------------------------------------------------
-
-from PIL import Image
-import torchvision.transforms as transforms
-
 class_names = [item[4:].replace("_", " ") for item in train_data.classes]
 
 def predict_breed_transfer(img_path):
@@ -269,6 +261,7 @@ def predict_breed_transfer(img_path):
     
     return class_names[index]
     
+#-------------------------------------------------------------------------------------------------
 def run_app(img_path):
     ## handle cases for a human face, dog, and neither
     if face_detector(img_path) == True:
