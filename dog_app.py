@@ -13,14 +13,16 @@ import torchvision.transforms as transforms
 import os
 from torchvision import datasets
 ImageFile.LOAD_TRUNCATED_IMAGES = True  # fixes problem of truncated images
+import torchvision.models as models
+import torch.nn as nn
 
 #-------------------------------------------------------------------------------------------------
-# load filenames for human and dog images
+# Load filenames for human and dog images -> see README
 human_files = np.array(glob("/data/lfw/*/*"))
 dog_files = np.array(glob("/data/dog_images/*/*/*"))
                            
 #-------------------------------------------------------------------------------------------------
-# extract pre-trained face detector
+# Use pre-trained face detector
 face_cascade = cv2.CascadeClassifier('haarcascades/haarcascade_frontalface_alt.xml')
 
 # returns "True" if face is detected in image stored at img_path
@@ -67,14 +69,12 @@ def VGG16_predict(img_path):
     
     image = transform_images(image)
     image = image.unsqueeze(0)   # required format for VGG-16
-    #image = image.cpu()
-    #VGG16 = VGG16.cpu()
     output = VGG16(image) 
     index = output.data.numpy().argmax()
         
     return index
     
-# returns "True" if a dog is detected in the image stored at img_path
+# Returns "True" if a dog is detected in the image stored at img_path
 def dog_detector(img_path):
     if ( VGG16_predict(img_path) >= 151 ) and ( VGG16_predict(img_path) <= 268 ):
         return True
@@ -82,15 +82,14 @@ def dog_detector(img_path):
         return False
         
 #-------------------------------------------------------------------------------------------------        
-# define training and validation of the model    
+# Define training and validation of the model    
 def train(n_epochs, loaders, model, optimizer, criterion, use_cuda, save_path):
     """returns trained model"""
-    # initialize tracker for minimum validation loss
+
     valid_loss_min = np.Inf 
     train_loss_min = np.Inf 
     
     for epoch in range(1, n_epochs+1):
-        # initialize variables to monitor training and validation loss
         train_loss = 0.0
         valid_loss = 0.0
         
@@ -98,7 +97,6 @@ def train(n_epochs, loaders, model, optimizer, criterion, use_cuda, save_path):
         # train the model #
         ###################
         model.train()
-        #for batch_idx, (data, target) in enumerate(loaders[0]):
         for data, target in train_loader:
 
             # move to GPU
@@ -119,7 +117,6 @@ def train(n_epochs, loaders, model, optimizer, criterion, use_cuda, save_path):
         with torch.no_grad():
             model.eval()
             for data, target in valid_loader:
-            #for batch_idx, (data, target) in enumerate(loaders[2]):
                 # move to GPU
                 if use_cuda:
                     data, target = data.cuda(), target.cuda()
@@ -141,7 +138,7 @@ def train(n_epochs, loaders, model, optimizer, criterion, use_cuda, save_path):
     return model
 
 #-------------------------------------------------------------------------------------------------    
- # define model testing
+# Define model testing
  def test(loaders, model, criterion, use_cuda):
 
     # monitor test loss and accuracy
@@ -150,7 +147,6 @@ def train(n_epochs, loaders, model, optimizer, criterion, use_cuda, save_path):
     total = 0.
 
     model.eval()
-    #for batch_idx, (data, target) in enumerate(loaders[1]):
     for data, target in valid_loader:
 
         # move to GPU
@@ -170,7 +166,6 @@ def train(n_epochs, loaders, model, optimizer, criterion, use_cuda, save_path):
         total += data.size(0)
             
     print('Test Loss: {:.6f}\n'.format(test_loss))
-
     print('\nTest Accuracy: %2d%% (%2d/%2d)' % (
         100. * correct / total, correct, total))
         
@@ -207,11 +202,7 @@ train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, nu
 test_loader  = torch.utils.data.DataLoader(test_data,  batch_size=batch_size, num_workers=num_workers)
 valid_loader = torch.utils.data.DataLoader(valid_data, batch_size=batch_size, num_workers=num_workers)
 
-
-import torchvision.models as models
-import torch.nn as nn
-
-# define VGG16 model
+# Define VGG16 model
 model_transfer = models.vgg16(pretrained=True)
 
 # Freeze feature layers
@@ -222,7 +213,7 @@ for param in model_transfer.features.parameters():
 input_dim = model_transfer.classifier[6].in_features
 model_transfer.classifier[6] = nn.Linear(input_dim, 133)    
     
-# check if CUDA is available
+# Check if CUDA is available
 use_cuda = torch.cuda.is_available()
 if use_cuda:
     model_transfer = model_transfer.cuda()
@@ -230,7 +221,7 @@ if use_cuda:
 criterion_transfer = nn.CrossEntropyLoss()
 optimizer_transfer = optim.SGD(model_transfer.classifier.parameters(), lr=0.0005)
 
-# train the model
+# Train the model
 n_epochs = 50
 loaders_transfer = [train_loader, test_loader, valid_loader]
 model_transfer = train(n_epochs, loaders_transfer, model_transfer,
